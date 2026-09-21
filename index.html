@@ -43,12 +43,8 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
   --shadow:0 2px 10px rgba(0,0,0,.35);
 }
 
-/* ============ 桌面侧边说明 ============ */
-.side-note{
-  width:310px; flex-shrink:0; background:#FFFDF9; border-radius:24px;
-  padding:28px 24px; box-shadow:0 2px 10px rgba(60,45,30,.08); align-self:center; color:#2C2925;
-  max-height:calc(100vh - 32px); overflow-y:auto;
-}
+/* ============ 桌面侧边说明（正式版隐藏，仅保留手机视图） ============ */
+.side-note{ display:none; }
 .side-note h1{ font-size:19px; margin-bottom:4px; }
 .side-note .sub{ font-size:12.5px; color:#8F877D; margin-bottom:16px; }
 .side-note p.desc{ font-size:13px; color:#8F877D; line-height:1.7; margin-bottom:16px; }
@@ -56,7 +52,13 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 .side-note li{ font-size:13px; line-height:1.6; padding:7px 0; border-top:1px dashed #ECE7DF; }
 .side-note li b{ color:#A85B31; font-weight:600; }
 .side-note .note{ margin-top:14px; font-size:12px; color:#BCB4AA; line-height:1.7; background:#F6F3EE; border-radius:12px; padding:10px 12px; }
-@media (max-width:960px){ .side-note{ display:none; } body{ padding:12px; } }
+/* 手机/窄屏：全屏铺满（不再显示手机壳和假状态栏） */
+@media (max-width:960px){
+  body{ padding:0; gap:0; }
+  .phone{ width:100vw; max-width:520px; height:100vh; height:100dvh; border-radius:0; box-shadow:none; padding:0; zoom:1 !important; }
+  .screen{ border-radius:0; height:100dvh; }
+  .statusbar{ display:none; }
+}
 
 /* ============ 手机框 ============ */
 .phone{
@@ -422,9 +424,9 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 /* ============ PWA 独立运行（添加到主屏幕后全屏 App 模式） ============ */
 body.pwa{ padding:0; gap:0; }
 body.pwa aside.side-note{ display:none; }
-body.pwa .phone{ width:100vw; max-width:520px; height:100vh; border-radius:0; box-shadow:none; zoom:1 !important; }
+body.pwa .phone{ width:100vw; max-width:520px; height:100vh; height:100dvh; border-radius:0; box-shadow:none; padding:0; zoom:1 !important; }
 body.pwa .statusbar{ display:none; }
-body.pwa .screen{ height:100vh; }
+body.pwa .screen{ border-radius:0; height:100dvh; }
 
 /* ============ 安装引导条 ============ */
 .install-tip{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%) translateY(140%);
@@ -629,7 +631,8 @@ body.pwa .screen{ height:100vh; }
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="mini-btn" id="exportData">导出备份</button>
               <button class="mini-btn" id="importData">导入备份</button>
-              <button class="mini-btn" id="resetData">恢复示例</button>
+              <button class="mini-btn" id="loadDemo">载入示例</button>
+              <button class="mini-btn" id="clearData">清空数据</button>
             </div>
           </div>
           <div class="me-item">
@@ -974,7 +977,7 @@ function ago(n,h,m){ return tAt(dayStart(n), h, m); }
 const typoSpan = (wrong, fix) => `<span class="typo" contenteditable="false" data-fix="${fix}">${wrong}</span>`;
 const locSpan = (name, addr) => `<span class="inline-loc" contenteditable="false" data-name="${name}" data-addr="${addr}">📍 ${name}</span>`;
 
-let diaries = [
+const DEMO_DIARIES = [ // 示例日记：不再自动塞入，想看效果去「我的 → 载入示例」
   { // 今天：多片段 + 多录音 + 内联地点
     date: dayStart(0), weather:'☀️', mood:'😊', tags:['life','food'],
     entries:[
@@ -1031,6 +1034,7 @@ let diaries = [
     ]
   },
 ];
+let diaries = []; /* 正式版：首次打开为空，内容只来自你的记录或导入的备份 */
 
 /* 模拟转写文案库（真实版由语音识别引擎生成） */
 const SIMU_TRANSCRIPTS = [
@@ -1101,7 +1105,14 @@ function renderFilterRow(){
 function renderTimeline(){
   const tl = $('timeline'); tl.innerHTML='';
   const list = diaries.filter(d=> !curFilter || d.tags.includes(curFilter));
-  if(!list.length){ tl.innerHTML = '<div style="text-align:center;color:var(--ink3);font-size:13px;padding:40px 0">该标签下暂无日记</div>'; }
+  if(!list.length){
+    tl.innerHTML = diaries.length
+      ? '<div style="text-align:center;color:var(--ink3);font-size:13px;padding:40px 0">该标签下暂无日记</div>'
+      : `<div style="text-align:center;color:var(--ink3);font-size:13.5px;padding:64px 24px;line-height:2.1">
+           还没有日记<br>点右下角 <b style="color:var(--primary);font-size:17px">＋</b> 写下第一条<br>
+           <span style="font-size:12px">想先看效果：我的 → 本地数据 → 载入示例</span>
+         </div>`;
+  }
   const byMonth = new Map();
   list.forEach((d,i)=>{
     const key = `${d.date.getFullYear()}年${d.date.getMonth()+1}月`;
@@ -2206,12 +2217,32 @@ $('fileImport').addEventListener('change',e=>{
   e.target.value='';
 });
 
-/* 恢复示例数据：清空本地存储后刷新（仅清 App 数据，不影响其他站点） */
-$('resetData').addEventListener('click',()=>{
-  if(confirm('清空本机已保存的日记，恢复为示例数据？')){
-    localStorage.removeItem(LS_KEY);
-    location.reload();
-  }
+/* 载入示例日记：想看演示效果时手动点，不再自动塞入 */
+$('loadDemo').addEventListener('click',()=>{
+  if(!confirm('载入示例日记？（会按日期合并进现有日记，不影响你已写的内容）')) return;
+  DEMO_DIARIES.forEach(demo=>{
+    const cur = diaries.find(x=>sameDay(x.date, demo.date));
+    if(cur){
+      demo.entries.forEach(e=>cur.entries.push({...e}));
+      cur.entries.sort((a,b)=>a.time-b.time);
+      cur.tags = [...new Set([...cur.tags, ...demo.tags])].slice(0,3);
+      if(!cur.weather) cur.weather = demo.weather;
+      if(!cur.mood) cur.mood = demo.mood;
+    }else{
+      diaries.push({...demo, entries:demo.entries.map(e=>({...e}))});
+    }
+  });
+  diaries.sort((a,b)=>b.date-a.date);
+  persist(); renderFilterRow(); renderTimeline();
+  toast('示例日记已载入', true);
+});
+/* 清空数据：重新开始（建议先导出备份） */
+$('clearData').addEventListener('click',()=>{
+  if(!confirm('清空本机全部日记？此操作不可恢复。建议先「导出备份」。')) return;
+  localStorage.removeItem(LS_KEY);
+  diaries = [];
+  persist(); renderFilterRow(); renderTimeline();
+  toast('已清空 · 开始记你自己的日记吧', true);
 });
 
 /* ================= 初始化 ================= */
@@ -2222,6 +2253,7 @@ if(restore()){
 /* 手机框随视口高度自适应缩放：视口不够高时整体缩小，避免外层页面滚动导致点击错位/元素够不到 */
 function fitPhone(){
   if(document.body.classList.contains('pwa')) return; /* App 模式已全屏，无需缩放 */
+  if(matchMedia('(max-width:960px)').matches) return; /* 手机/窄屏已全屏铺满 */
   const z = Math.min(1, (innerHeight - 48) / 868);
   document.querySelector('.phone').style.zoom = String(z);
 }
