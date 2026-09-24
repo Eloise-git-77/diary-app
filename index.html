@@ -684,7 +684,7 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
             </div>
           </div>
           <div class="me-item">
-            <div class="m-tt"><div class="m-nm">关于拾光日记</div><div class="m-ds">v1.1 · 可安装离线版 · 数据本地优先</div></div>
+            <div class="m-tt"><div class="m-nm">关于拾光日记</div><div class="m-ds" id="aboutVer">· 可安装离线版 · 数据本地优先</div></div>
           </div>
         </div>
       </div>
@@ -2490,6 +2490,7 @@ renderTimeline();
 /* Service Worker：离线缓存（不支持的环境静默跳过） */
 /* 版本显示 + 手动检查更新：绕过缓存拉最新 sw.js，装好后提示重启 */
 $('appVersion').textContent = APP_VERSION;
+$('aboutVer').textContent = `${APP_VERSION} · 可安装离线版 · 数据本地优先`;
 $('checkUpdate').addEventListener('click', async ()=>{
   const info = $('updInfo');
   if(!('serviceWorker' in navigator)){ info.textContent = '当前环境不支持自动更新'; return; }
