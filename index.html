@@ -180,6 +180,10 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 .e-text:empty::before{ content:attr(data-ph); color:var(--ink3); }
 .e-text:focus{ box-shadow:0 1px 0 var(--line); }
 .d-text{ font-size:15.5px; line-height:1.9; white-space:pre-wrap; }
+.d-text.editing{ outline:1.5px dashed var(--primary); outline-offset:5px; border-radius:4px;
+  -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+.add-more{ width:100%; margin:20px 0 6px; font-size:14px; font-weight:600; color:var(--primary-deep);
+  background:var(--primary-soft); padding:13px 0; border-radius:14px; }
 
 /* 内联地点 */
 .inline-loc{ display:inline-flex; align-items:center; background:var(--primary-soft); color:var(--primary-deep);
@@ -833,7 +837,7 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
       <div class="sheet">
         <div class="grab"></div>
         <div class="sheet-ttl">日记操作</div>
-        <div class="sheet-sub">长按任意片段（电脑上右键），可单独删除该片段</div>
+        <div class="sheet-sub">点文字片段可直接修改（时间点不变）；长按片段（电脑右键）单独删除</div>
         <div class="more-list">
           <button class="more-btn danger" id="delDiaryBtn">🗑 删除这篇日记</button>
           <button class="more-btn" id="moreCancel">取消</button>
@@ -1233,13 +1237,17 @@ document.addEventListener('selectionchange',()=>{
   }
 });
 
-$('fabNew').addEventListener('click',openCompose);
-function openCompose(){
-  Object.assign(compose,{ weather:null, mood:null, tags:[], entries:[] });
+$('fabNew').addEventListener('click',()=>openCompose());
+/* target：要追加到的日期（从详情页"再记一笔"进入时传）；fromDetail：来源日记索引 */
+function openCompose(target, fromDetail){
+  Object.assign(compose,{ weather:null, mood:null, tags:[], entries:[], target:target||null, fromDetail:(fromDetail==null?null:fromDetail) });
   $('moodRow').querySelectorAll('.pill').forEach(p=>p.classList.remove('sel'));
-  const now = new Date();
-  $('composeDate').textContent = `${now.getMonth()+1}月${now.getDate()}日 ${WEEK[now.getDay()]}`;
-  $('composeSub').textContent = `今天 · 碎片随时记，每条都会记下时间点`;
+  const now = new Date(), tgt = target || now;
+  const isToday = !target || sameDay(tgt, now);
+  $('composeDate').textContent = `${tgt.getMonth()+1}月${tgt.getDate()}日 ${WEEK[tgt.getDay()]}`;
+  $('composeSub').textContent = isToday
+    ? '今天 · 碎片随时记，每条都会记下时间点'
+    : `补记这一天 · 新片段的时间点记为现在（${fmtHM(now)}），原有片段时间不变`;
   $('entryFlow').innerHTML='';
   $('view-compose').classList.add('active');
   $('tabbar').classList.add('hidden');
@@ -1251,9 +1259,22 @@ function openCompose(){
     <div class="eh-s">点击下方工具栏选择形式<br>文字 · 照片 · 视频 · 录音 · 地点随记随加</div>
   </div>`;
 }
+/* 补记模式下，新片段的时间戳落在目标日期（时刻用当下时钟），保证归入正确的那天 */
+function composeNow(){
+  const n = new Date();
+  if(!compose.target) return n;
+  const t = new Date(compose.target);
+  t.setHours(n.getHours(), n.getMinutes(), n.getSeconds(), 0);
+  return t;
+}
 $('btnCancel').addEventListener('click',()=>{
   $('view-compose').classList.remove('active');
-  $('tabbar').classList.remove('hidden');
+  /* 详情页进来的取消：回详情页（其仍处于 active）；否则显示底栏回首页 */
+  if(compose.fromDetail != null && diaries[compose.fromDetail]){
+    $('view-detail').classList.add('active');
+  }else{
+    $('tabbar').classList.remove('hidden');
+  }
 });
 $('moodRow').querySelectorAll('.pill').forEach(p=>{
   p.addEventListener('click',()=>{
@@ -1282,7 +1303,7 @@ function blkShell(entry){
   return blk;
 }
 function addTextEntry(autofocus = true){
-  const entry = { id:uid(), type:'text', time:new Date(), html:'' };
+  const entry = { id:uid(), type:'text', time:composeNow(), html:'' };
   compose.entries.push(entry);
   const blk = blkShell(entry);
   const txt = document.createElement('div');
@@ -1389,7 +1410,7 @@ $('toolPhoto').addEventListener('click',()=>{
 });
 $('filePhoto').addEventListener('change',e=>{
   const files=[...e.target.files]; if(!files.length) return;
-  const entry = { id:uid(), type:'photos', time:new Date(), photos:[] };
+  const entry = { id:uid(), type:'photos', time:composeNow(), photos:[] };
   compose.entries.push(entry);
   const blk = blkShell(entry);
   const strip = document.createElement('div');
@@ -1415,7 +1436,7 @@ $('toolVideo').addEventListener('click',()=>{
 $('fileVideo').addEventListener('change',e=>{
   const f = e.target.files[0]; if(!f) return;
   const key = 'v_'+uid();
-  const entry = { id:uid(), type:'video', time:new Date(),
+  const entry = { id:uid(), type:'video', time:composeNow(),
     video:{ src:URL.createObjectURL(f), idbKey:key, emoji:'🎬', duration:'—' }, transcriptHtml:null };
   compose.entries.push(entry);
   /* 原始视频文件落盘 IndexedDB：刷新/重启后仍可播放，并能进备份迁移到新手机 */
@@ -1464,7 +1485,7 @@ $('toolMic').addEventListener('click',()=>{
 function startRec(){
   recState='recording'; recSec=0;
   $('micLabel').textContent='停止'; $('toolMic').classList.add('rec-on');
-  recEntry = { id:uid(), type:'audio', time:new Date(), audio:{duration:'0:00'}, transcriptHtml:null };
+  recEntry = { id:uid(), type:'audio', time:composeNow(), audio:{duration:'0:00'}, transcriptHtml:null };
   compose.entries.push(recEntry);
   recBlk = blkShell(recEntry);
   recBlk.querySelector('.e-body').innerHTML = `
@@ -1659,28 +1680,40 @@ $('btnSave').addEventListener('click',()=>{
   btn.disabled=true; btn.classList.add('saving'); btn.textContent='保存中…';
   $('cloudDot').classList.add('syncing');
   setTimeout(()=>{
-    const today = diaries.find(d=>sameDay(d.date, new Date()));
-    if(today){
-      today.entries.push(...valid);
-      today.entries.sort((a,b)=>a.time-b.time);
-      const merged = [...new Set([...today.tags, ...compose.tags])].slice(0,3);
-      today.tags = merged;
-      if(compose.weather) today.weather = compose.weather;
-      if(compose.mood) today.mood = compose.mood;
-      generateSummary(today);
+    const target = compose.target || new Date();
+    const day = diaries.find(d=>sameDay(d.date, target));
+    if(day){
+      day.entries.push(...valid);
+      day.entries.sort((a,b)=>a.time-b.time);
+      const merged = [...new Set([...day.tags, ...compose.tags])].slice(0,3);
+      day.tags = merged;
+      if(compose.weather) day.weather = compose.weather;
+      if(compose.mood) day.mood = compose.mood;
+      generateSummary(day);
       renderTimeline();
-      toast(`已追加 ${valid.length} 个片段到今天的日记`, true);
+      const isToday = sameDay(target, new Date());
+      toast(isToday ? `已追加 ${valid.length} 个片段到今天的日记` :
+        `已补记 ${valid.length} 个片段到 ${target.getMonth()+1}月${target.getDate()}日`, true);
     } else {
-      const d = { date:new Date(), weather:compose.weather, mood:compose.mood,
+      const d = { date:new Date(target), weather:compose.weather, mood:compose.mood,
         tags:[...compose.tags], entries:[...valid] };
       generateSummary(d);
       diaries.unshift(d);
+      diaries.sort((a,b)=>b.date-a.date);
       renderTimeline();
       toast('已保存到本机 · 今日总结已生成', true);
     }
     persist(); /* 落盘：断网/重启不丢 */
     $('view-compose').classList.remove('active');
-    $('tabbar').classList.remove('hidden');
+    /* 从详情页"再记一笔"进来的：回到那篇详情并刷新；否则回首页 */
+    const fd = compose.fromDetail;
+    if(fd != null && diaries[fd]){
+      curDetail = fd;
+      renderDetail();
+      $('view-detail').classList.add('active');
+    }else{
+      $('tabbar').classList.remove('hidden');
+    }
     btn.disabled=false; btn.classList.remove('saving'); btn.textContent='保存';
     $('cloudDot').classList.remove('syncing');
     $('lastSync').textContent='上次保存：刚刚';
@@ -1762,7 +1795,7 @@ function renderDetail(){
   /* 片段流 */
   d.entries.forEach((e,ei)=>{
     html += `<div class="entry-blk"><div class="e-top"><span class="e-time">${fmtHM(e.time)}</span></div><div class="e-body">`;
-    if(e.type==='text') html += `<div class="d-text">${e.html}</div>`;
+    if(e.type==='text') html += `<div class="d-text" data-ei="${ei}">${e.html}</div>`;
     if(e.type==='photos'){
       const s0 = mediaStart.get(ei);
       /* 少图平铺一眼全览，多图（≥5）堆叠相纸左右翻看 */
@@ -1807,7 +1840,8 @@ function renderDetail(){
     </div>`;
   }
 
-  html += `<div class="sync-foot">
+  html += `<button class="add-more" id="btnAddMore">＋ 再记一笔 · 往这天补片段</button>
+  <div class="sync-foot">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.7 8.5 4 4 0 0 1 17.5 18z"/></svg>
     已自动存本机 · 备份可从「我的」导出</div>`;
   body.innerHTML = html;
@@ -1826,6 +1860,36 @@ function renderDetail(){
   });
 
   body.querySelector('#chatBtn').addEventListener('click',()=>openAgent(curDetail));
+
+  /* 再记一笔：以这天为目标打开新建（新片段时间=现在，原有片段时间不变） */
+  body.querySelector('#btnAddMore').addEventListener('click',()=>openCompose(new Date(d.date), curDetail));
+
+  /* 文字片段点击即改：改完失焦保存，时间点保持最初 */
+  body.querySelectorAll('.d-text').forEach(el=>{
+    const ei = +el.dataset.ei;
+    el.addEventListener('click',()=>{
+      if(el.isContentEditable) return;
+      el.contentEditable = 'true';
+      el.classList.add('editing');
+      el.focus();
+      const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    el.addEventListener('blur',()=>{
+      if(!el.isContentEditable) return;
+      el.contentEditable = 'false';
+      el.classList.remove('editing');
+      const dd = diaries[curDetail]; if(!dd) return;
+      const ent = dd.entries[ei]; if(!ent) return;
+      const nh = el.innerHTML.trim();
+      if(nh !== (ent.html||'')){
+        ent.html = nh;
+        generateSummary(dd);
+        persist(); renderTimeline();
+        toast('已保存修改 · 时间点不变', true);
+      }
+    });
+  });
 
   /* 点击照片/视频 → 全屏查看（跨片段切换全天媒体；真实视频文件在大图中直接播放） */
   body.querySelectorAll('.photo-grid img.pg, .stack-row img').forEach(img=>{
@@ -1846,8 +1910,9 @@ function renderDetail(){
       if(box) box.innerHTML = `<video src="${url}" controls style="width:100%;height:100%;object-fit:cover;border-radius:16px"></video>`;
     });
   });
-  /* 长按片段删除（手机长按 0.6s / 电脑右键），删空则整篇移除 */
+  /* 长按片段删除（手机长按 0.6s / 电脑右键），删空则整篇移除；点文字编辑区不触发 */
   const TYPE_NAME = { text:'文字', photos:'照片', video:'视频', audio:'录音' };
+  const inEditZone = t => t.closest && t.closest('.d-text, .trans-card, video, .audio-card, .add-more');
   const delFragment = ei=>{
     const d = diaries[curDetail]; if(!d) return;
     const e = d.entries[ei]; if(!e) return;
@@ -1868,10 +1933,10 @@ function renderDetail(){
   };
   body.querySelectorAll('.entry-blk').forEach((blk,ei)=>{
     let t = null;
-    blk.addEventListener('touchstart',()=>{ t = setTimeout(()=>{ t = null; delFragment(ei); }, 600); }, {passive:true});
+    blk.addEventListener('touchstart',ev=>{ if(inEditZone(ev.target)) return; t = setTimeout(()=>{ t = null; delFragment(ei); }, 600); }, {passive:true});
     blk.addEventListener('touchend', ()=>{ if(t){ clearTimeout(t); t = null; } });
     blk.addEventListener('touchmove', ()=>{ if(t){ clearTimeout(t); t = null; } });
-    blk.addEventListener('contextmenu',ev=>{ ev.preventDefault(); delFragment(ei); });
+    blk.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(inEditZone(ev.target)) return; delFragment(ei); });
   });
 
   renderTimeline();
