@@ -1,5 +1,5 @@
 /* 拾光日记 Service Worker：离线可用 + 媒体运行时缓存（相对路径，任意子目录部署均可用） */
-const CACHE = 'shiguang-v5';
+const CACHE = 'shiguang-v6';
 const PRECACHE = [
   './index.html',
   './manifest.json',
@@ -29,10 +29,10 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  /* 页面导航：网络优先（保证更新），离线回退缓存页 */
+  /* 页面导航：网络优先（cache:reload 绕过 HTTP 缓存，保证每次拿到最新页面） */
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'reload' })
         .then(res => {
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put('./index.html', copy));

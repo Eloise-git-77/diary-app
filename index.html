@@ -678,6 +678,12 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
             <div class="m-tt"><div class="m-nm">安装到主屏幕</div><div class="m-ds">Safari 分享 → 添加到主屏幕 · 全屏运行离线可用</div></div>
           </div>
           <div class="me-item">
+            <div class="m-tt"><div class="m-nm">版本 <span id="appVersion"></span></div><div class="m-ds" id="updInfo">更新有滞后时点下方按钮检查</div></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="mini-btn" id="checkUpdate">检查更新</button>
+            </div>
+          </div>
+          <div class="me-item">
             <div class="m-tt"><div class="m-nm">关于拾光日记</div><div class="m-ds">v1.1 · 可安装离线版 · 数据本地优先</div></div>
           </div>
         </div>
@@ -931,6 +937,7 @@ const THEMES = {
   rose:{       name:'樱粉',   p:'#C96A82', s:'#F7E6EB', d:'#A85468', sd:'#3C242C', dd:'#E594AA' },
 };
 const settings = { theme:'terracotta', darkMode:'system', nightAuto:false, bgLight:'cream', bgDark:'charcoal' };
+const APP_VERSION = 'v1.2'; /* 「我的」页展示 · 改动时同步更新 */
 let profile = { name:'柚子', emoji:'柚' }; /* 本机资料（网页版无账号，随备份迁移） */
 const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -2481,8 +2488,46 @@ initThemeUI();
 renderFilterRow();
 renderTimeline();
 /* Service Worker：离线缓存（不支持的环境静默跳过） */
+/* 版本显示 + 手动检查更新：绕过缓存拉最新 sw.js，装好后提示重启 */
+$('appVersion').textContent = APP_VERSION;
+$('checkUpdate').addEventListener('click', async ()=>{
+  const info = $('updInfo');
+  if(!('serviceWorker' in navigator)){ info.textContent = '当前环境不支持自动更新'; return; }
+  info.textContent = '检查中…';
+  try{
+    const reg = await navigator.serviceWorker.getRegistration();
+    if(!reg){ info.textContent = '未安装离线组件 · 联网状态可直接使用'; return; }
+    await reg.update();
+    if(reg.installing){
+      info.textContent = '发现新版本 · 正在后台安装，装完需重启 App';
+    }else{
+      info.textContent = `已是最新（${APP_VERSION}）`;
+    }
+  }catch(err){
+    info.textContent = '检查失败 · 稍后再试或清一次 Safari 网站数据';
+  }
+});
+
+/* iOS 双指缩放禁用（gesturestart 是苹果私有事件，Safari 浏览器模式也有效） */
+['gesturestart','gesturechange','gestureend'].forEach(ev=>
+  document.addEventListener(ev, e=>e.preventDefault(), {passive:false}));
+
 if('serviceWorker' in navigator){
-  addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  /* updateViaCache:none — 每次都拿最新 sw.js（绕过 HTTP 缓存，更新不再滞后 10 分钟） */
+  addEventListener('load', async ()=>{
+    try{
+      const reg = await navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
+      reg.update().catch(()=>{});
+      /* 有新版本装好了 → 提示重启生效 */
+      reg.addEventListener('updatefound', ()=>{
+        const nw = reg.installing;
+        if(nw) nw.addEventListener('statechange', ()=>{
+          if(nw.state==='installed' && navigator.serviceWorker.controller)
+            toast('新版本已就绪 · 完全关闭 App 后重新打开即可生效', true);
+        });
+      });
+    }catch(err){ /* 不支持的环境静默跳过 */ }
+  });
 }
 window.__booted = true;
 </script>
