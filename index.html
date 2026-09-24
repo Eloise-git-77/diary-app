@@ -165,7 +165,8 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 
 /* ============ 片段流（新建 & 详情共用） ============ */
 .entry-flow{ flex:1; overflow-y:auto; padding:4px 6px 24px; }
-.entry-blk{ position:relative; padding:6px 0 18px 56px; }
+.entry-blk{ position:relative; padding:6px 0 18px 56px;
+  -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .entry-blk::before{ content:''; position:absolute; left:23px; top:14px; width:7px; height:7px;
   border-radius:50%; background:var(--primary); opacity:.85; }
 .entry-blk::after{ content:''; position:absolute; left:26px; top:26px; bottom:2px; width:1px; background:var(--line); }
@@ -319,6 +320,22 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
   display:flex; align-items:center; justify-content:center; font-size:32px; color:#fff; }
 .me-head .nm{ font-size:18px; font-weight:700; margin-top:12px; }
 .me-head .st{ font-size:12.5px; color:var(--ink2); margin-top:3px; }
+.me-edit-tip{ font-size:11px; color:var(--ink3); margin-top:8px; padding:5px 12px;
+  border:1px dashed var(--line); border-radius:99px; }
+
+/* ============ 编辑资料 ============ */
+.prof-preview{ display:flex; align-items:center; gap:12px; padding:14px 4px 4px; }
+.prof-preview .avatar{ width:52px; height:52px; font-size:24px; }
+.pv-name{ font-size:16px; font-weight:700; }
+.prof-label{ font-size:12.5px; font-weight:600; color:var(--ink2); margin:12px 2px 7px; }
+#nameInput{ width:100%; font-size:14.5px; padding:11px 13px; border-radius:12px; border:1px solid var(--line);
+  background:var(--card); color:var(--ink); outline:none; }
+#nameInput:focus{ border-color:var(--primary); }
+.emoji-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+.emoji-grid button{ font-size:22px; padding:9px 0; border-radius:12px; background:var(--card); box-shadow:var(--shadow); }
+.emoji-grid button.sel{ background:var(--primary-soft); box-shadow:0 0 0 2px var(--primary); }
+.prof-save{ width:100%; margin-top:16px; font-size:14.5px; font-weight:700; color:#fff;
+  background:var(--primary); padding:13px 0; border-radius:14px; }
 .me-card{ background:var(--card); border-radius:var(--radius); padding:6px 18px; box-shadow:var(--shadow); margin-top:14px; }
 .me-item{ display:flex; align-items:center; gap:12px; padding:15px 0; border-bottom:1px solid var(--line); }
 .me-item:last-child{ border-bottom:none; }
@@ -480,6 +497,12 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
 .new-tag-row button{ font-size:13.5px; font-weight:600; color:var(--primary-deep);
   background:var(--primary-soft); padding:0 18px; border-radius:12px; }
 
+/* ============ 日记操作菜单 ============ */
+.more-list{ display:flex; flex-direction:column; gap:10px; padding-bottom:8px; }
+.more-btn{ width:100%; font-size:14.5px; font-weight:600; padding:13px 0; border-radius:14px;
+  background:var(--card); color:var(--ink); box-shadow:var(--shadow); }
+.more-btn.danger{ color:#E36A6E; }
+
 /* ============ 错别字气泡 & Toast ============ */
 .typo-pop{ position:absolute; z-index:60; background:#33291F; color:#fff; border-radius:14px;
   padding:11px 13px; box-shadow:0 10px 30px rgba(0,0,0,.3);
@@ -555,10 +578,11 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
     <!-- ============ 我的 ============ -->
     <section class="view" id="view-me">
       <div class="app-body">
-        <div class="me-head">
-          <div class="avatar">柚</div>
-          <div class="nm">柚子</div>
-          <div class="st">已连续记录 23 天 🔥</div>
+        <div class="me-head" id="meHead">
+          <div class="avatar" id="meAvatar">柚</div>
+          <div class="nm" id="meName">柚子</div>
+          <div class="st" id="meStreak">已连续记录 0 天 🔥</div>
+          <div class="me-edit-tip">点击修改昵称和头像</div>
         </div>
 
         <div class="me-card">
@@ -609,7 +633,7 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
             </div>
             <div class="m-tt">
               <div class="m-nm">语音转文字引擎</div>
-              <div class="m-ds">云端 AI 纠错更准，按量计费</div>
+              <div class="m-ds">原型演示：转写为内置示例文案 · 未接真实引擎 · 不产生任何费用</div>
               <div class="radio-g" style="margin-top:8px">
                 <button class="rg" data-eng="device">设备端（免费）</button>
                 <button class="rg sel" data-eng="cloud">云端 AI 纠错</button>
@@ -804,6 +828,34 @@ body.pwa .screen{ border-radius:0; height:100dvh; }
       </div>
     </div>
 
+    <!-- ============ 日记操作菜单 ============ -->
+    <div class="mask" id="moreMask">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sheet-ttl">日记操作</div>
+        <div class="sheet-sub">长按任意片段（电脑上右键），可单独删除该片段</div>
+        <div class="more-list">
+          <button class="more-btn danger" id="delDiaryBtn">🗑 删除这篇日记</button>
+          <button class="more-btn" id="moreCancel">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 编辑资料 ============ -->
+    <div class="mask" id="meMask">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sheet-ttl">编辑资料</div>
+        <div class="sheet-sub">资料只保存在本机（网页版无账号系统，换手机靠备份迁移）</div>
+        <div class="prof-preview"><div class="avatar" id="pvAvatar">柚</div><div class="pv-name" id="pvName">柚子</div></div>
+        <div class="prof-label">昵称</div>
+        <input id="nameInput" maxlength="12" placeholder="给自己起个名字…">
+        <div class="prof-label">头像</div>
+        <div class="emoji-grid" id="emojiGrid"></div>
+        <button class="prof-save" id="saveProfile">保存</button>
+      </div>
+    </div>
+
     <!-- 错别字气泡 -->
     <div class="typo-pop" id="typoPop">
       <div class="tp-row">
@@ -867,6 +919,7 @@ const THEMES = {
   rose:{       name:'樱粉',   p:'#C96A82', s:'#F7E6EB', d:'#A85468', sd:'#3C242C', dd:'#E594AA' },
 };
 const settings = { theme:'terracotta', darkMode:'system', nightAuto:false, bgLight:'cream', bgDark:'charcoal' };
+let profile = { name:'柚子', emoji:'柚' }; /* 本机资料（网页版无账号，随备份迁移） */
 const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
 
 /* 背景色板：浅色/深色模式各一组，与主题色自由搭配 */
@@ -1152,6 +1205,7 @@ function renderTimeline(){
   $('statEntry').textContent = diaries.reduce((s,d)=>s+d.entries.length,0);
   $('statPhoto').textContent = diaries.reduce((s,d)=>s+d.entries.filter(e=>e.type==='photos').reduce((x,e)=>x+e.photos.length,0),0);
   $('statTag').textContent = TAGS.length;
+  renderProfile(); /* 连续记录天数随日记变化刷新 */
 }
 
 /* ================= Tab ================= */
@@ -1645,7 +1699,23 @@ $('btnBack').addEventListener('click',()=>{
   $('view-detail').classList.remove('active');
   $('tabbar').classList.remove('hidden');
 });
-$('btnDetailMore').addEventListener('click',()=>toast('原型阶段：编辑 / 删除 / 分享为演示菜单'));
+/* 详情页 ···：真·操作菜单（删除整篇；长按片段删单个） */
+$('btnDetailMore').addEventListener('click',()=>$('moreMask').classList.add('show'));
+$('moreMask').addEventListener('click',e=>{
+  if(e.target===$('moreMask')) $('moreMask').classList.remove('show');
+});
+$('moreCancel').addEventListener('click',()=>$('moreMask').classList.remove('show'));
+$('delDiaryBtn').addEventListener('click',()=>{
+  $('moreMask').classList.remove('show');
+  const d = diaries[curDetail];
+  if(!d) return;
+  if(!confirm(`删除 ${d.date.getMonth()+1}月${d.date.getDate()}日 的整篇日记？\n共 ${d.entries.length} 个片段，删除后不可恢复。`)) return;
+  diaries.splice(curDetail,1);
+  persist(); renderFilterRow(); renderTimeline();
+  $('view-detail').classList.remove('active');
+  $('tabbar').classList.remove('hidden');
+  toast('已删除这篇日记', true);
+});
 
 function renderDetail(){
   const d = diaries[curDetail];
@@ -1776,6 +1846,34 @@ function renderDetail(){
       if(box) box.innerHTML = `<video src="${url}" controls style="width:100%;height:100%;object-fit:cover;border-radius:16px"></video>`;
     });
   });
+  /* 长按片段删除（手机长按 0.6s / 电脑右键），删空则整篇移除 */
+  const TYPE_NAME = { text:'文字', photos:'照片', video:'视频', audio:'录音' };
+  const delFragment = ei=>{
+    const d = diaries[curDetail]; if(!d) return;
+    const e = d.entries[ei]; if(!e) return;
+    if(!confirm(`删除 ${fmtHM(e.time)} 的这个${TYPE_NAME[e.type]||''}片段？`)) return;
+    d.entries.splice(ei,1);
+    if(!d.entries.length){
+      diaries.splice(curDetail,1);
+      persist(); renderFilterRow(); renderTimeline();
+      $('view-detail').classList.remove('active');
+      $('tabbar').classList.remove('hidden');
+      toast('片段已删空 · 这篇日记一并删除', true);
+    }else{
+      generateSummary(d);
+      persist(); renderFilterRow(); renderTimeline();
+      renderDetail();
+      toast('片段已删除', true);
+    }
+  };
+  body.querySelectorAll('.entry-blk').forEach((blk,ei)=>{
+    let t = null;
+    blk.addEventListener('touchstart',()=>{ t = setTimeout(()=>{ t = null; delFragment(ei); }, 600); }, {passive:true});
+    blk.addEventListener('touchend', ()=>{ if(t){ clearTimeout(t); t = null; } });
+    blk.addEventListener('touchmove', ()=>{ if(t){ clearTimeout(t); t = null; } });
+    blk.addEventListener('contextmenu',ev=>{ ev.preventDefault(); delFragment(ei); });
+  });
+
   renderTimeline();
 }
 
@@ -1975,6 +2073,50 @@ $('screen').addEventListener('click',e=>{
 }, true);
 
 /* ================= 我的页开关 ================= */
+/* 资料：真实连续记录天数 + 编辑（昵称/头像，存本机、随备份迁移） */
+const AVATARS = ['柚','茶','猫','狗','花','月','晴','咖','果','鹿','熊','鲸'];
+function streakDays(){
+  const days = new Set(diaries.map(d=>{ const t=new Date(d.date); return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`; }));
+  const key = t=>`${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`;
+  let n = 0; const cur = new Date();
+  if(!days.has(key(cur))) cur.setDate(cur.getDate()-1); /* 今天还没记，从昨天起算不打断连签 */
+  while(days.has(key(cur))){ n++; cur.setDate(cur.getDate()-1); }
+  return n;
+}
+function renderProfile(){
+  $('meAvatar').textContent = profile.emoji;
+  $('meName').textContent = profile.name;
+  const s = streakDays();
+  $('meStreak').textContent = s>0 ? `已连续记录 ${s} 天 🔥` : '今天记一篇，开始连签吧';
+}
+let pickEmoji = null;
+function openProfileSheet(){
+  pickEmoji = profile.emoji;
+  $('nameInput').value = profile.name;
+  $('pvAvatar').textContent = profile.emoji;
+  $('pvName').textContent = profile.name;
+  $('emojiGrid').innerHTML = AVATARS.map(e=>
+    `<button class="${e===pickEmoji?'sel':''}" data-e="${e}">${e}</button>`).join('');
+  $('emojiGrid').querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      pickEmoji = b.dataset.e;
+      $('emojiGrid').querySelectorAll('button').forEach(x=>x.classList.toggle('sel', x===b));
+      $('pvAvatar').textContent = pickEmoji;
+    });
+  });
+  $('meMask').classList.add('show');
+}
+$('meHead').addEventListener('click', openProfileSheet);
+$('meMask').addEventListener('click',e=>{ if(e.target===$('meMask')) $('meMask').classList.remove('show'); });
+$('nameInput').addEventListener('input',()=>{ $('pvName').textContent = $('nameInput').value.trim() || profile.name; });
+$('saveProfile').addEventListener('click',()=>{
+  const name = $('nameInput').value.trim();
+  if(!name){ toast('昵称不能为空'); return; }
+  profile = { name, emoji:pickEmoji || profile.emoji };
+  persist(); renderProfile();
+  $('meMask').classList.remove('show');
+  toast('资料已保存', true);
+});
 $('icloudSwitch').addEventListener('click',e=>{
   e.currentTarget.classList.toggle('off');
   const off = e.currentTarget.classList.contains('off');
@@ -2058,7 +2200,7 @@ function persist(){
           delete c.__edited;
           return c;
         })})),
-      settings, tags: TAGS
+      settings, tags: TAGS, profile: { name:profile.name, emoji:profile.emoji }
     }));
     const el = $('dataInfo');
     if(el) el.textContent = `已自动保存 ${diaries.length} 篇日记 · 断网/重启不丢失`;
@@ -2084,6 +2226,7 @@ function restore(){
         })}));
     }
     if(data.settings) Object.assign(settings, data.settings);
+    if(data.profile && data.profile.name) profile = data.profile;
     if(Array.isArray(data.tags) && data.tags.length) TAGS = data.tags;
     return true;
   }catch(err){ return false; }
@@ -2149,7 +2292,7 @@ $('exportData').addEventListener('click', async ()=>{
         return c;
       })})),
     videos: vids,
-    settings, tags: TAGS
+    settings, tags: TAGS, profile
   };
   const blob = new Blob([JSON.stringify(payload,null,1)],{type:'application/json'});
   const a = document.createElement('a');
@@ -2208,8 +2351,9 @@ $('fileImport').addEventListener('change',e=>{
     });
     diaries.sort((a,b)=>b.date-a.date);
     if(data.settings) Object.assign(settings, data.settings);
+    if(data.profile && data.profile.name) profile = data.profile;
     if(Array.isArray(data.tags) && data.tags.length) TAGS = data.tags;
-    persist(); renderFilterRow(); renderTimeline(); applyTheme(); initThemeUI();
+    persist(); renderFilterRow(); renderTimeline(); applyTheme(); initThemeUI(); renderProfile();
     const vtxt = vidsOK ? ` · 视频 ${vidsOK} 段` : '';
     toast(`导入完成：新增 ${added} 篇 · 合并 ${merged} 篇${vtxt}`, true);
   };
